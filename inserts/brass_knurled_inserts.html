@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Metric & Imperial Insert Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chosen Palette: Warm Neutrals with Subtle Accents -->
+    <!-- Application Structure Plan: A dashboard-style layout featuring a primary filter for metric size, a dynamic data table, and an interactive canvas visualizer. This structure was chosen to provide a user-friendly flow from a general overview to specific, detailed information. The user can filter the dataset to their primary requirement (e.g., M3 inserts) and then get immediate visual feedback by selecting a specific size from the table. This combination of filtering and visualization makes the technical data highly accessible and easy to understand for engineers and hobbyists alike. -->
+    <!-- Visualization & Content Choices: The core data from the report is presented in an interactive HTML table (Goal: Inform/Compare). A dropdown menu allows users to filter this data by 'Metric Insert Size' (Goal: Organize). The key visualization is a dynamically rendered HTML5 Canvas diagram (Goal: Inform/Relationships). When a user clicks a table row, the canvas updates to show a scaled cross-section of the selected insert and its corresponding hole, with all dimensions clearly labeled. This was chosen over static images or SVG to provide a dynamic, data-driven visual aid that directly corresponds to user interaction, making the relationship between the table data and the physical object intuitive. No SVG or Mermaid JS is used. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .table-container {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            height: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (max-width: 768px) {
+            .canvas-container {
+                height: 350px;
+            }
+        }
+        table thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f3f4f6; /* bg-gray-100 */
+        }
+        .selected-row {
+            background-color: #dbeafe; /* blue-100 */
+        }
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Interactive Insert Guide</h1>
+            <p class="mt-2 text-gray-600 max-w-3xl mx-auto">This tool provides detailed specifications for heat-set threaded inserts. Use the filter to select a size, then click on a row in the table to see a visual representation of the insert and the required hole dimensions.</p>
+        </header>
+
+        <main class="bg-white p-6 rounded-2xl shadow-lg">
+            <div class="mb-6">
+                <label for="sizeFilter" class="block text-sm font-medium text-gray-700 mb-2">Filter by Size:</label>
+                <select id="sizeFilter" class="w-full md:w-1/3 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">Show All</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="flex flex-col">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">Insert Specifications</h2>
+                    <div class="table-container border border-gray-200 rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fastener Dia.</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Insert Length</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hole Dia.</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hole Depth</th>
+                                </tr>
+                            </thead>
+                            <tbody id="insertTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- Rows will be inserted by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="flex flex-col">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">Dimension Visualizer</h2>
+                    <div id="canvas-parent" class="canvas-container bg-gray-100 rounded-lg flex items-center justify-center p-4 border border-gray-200">
+                        <canvas id="insertCanvas"></canvas>
+                        <p id="canvas-placeholder" class="text-gray-500">Select a row from the table to view diagram.</p>
+                    </div>
+                    <div id="zoom-controls" class="flex items-center justify-center mt-4 space-x-2">
+                        <button id="zoom-in" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors text-lg font-bold">+</button>
+                        <button id="zoom-out" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors text-lg font-bold">-</button>
+                        <button id="zoom-reset" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors">Reset</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="text-center mt-8 text-sm text-gray-500">
+            <p>Designed to make technical specifications intuitive and accessible.</p>
+        </footer>
+    </div>
+
+    <script>
+        const imperialDiaMap = {
+            '4': 0.112,
+            '6': 0.138,
+            '8': 0.164,
+        };
+
+        const insertData = [
+            // Metric Data
+            { m: 'M2', type: 'Metric', k: 3.5, l: 3 }, { m: 'M2.5', type: 'Metric', k: 3.5, l: 4 },
+            { m: 'M3', type: 'Metric', k: 4.2, l: 3 }, { m: 'M3', type: 'Metric', k: 4.2, l: 4 },
+            { m: 'M3', type: 'Metric', k: 4.2, l: 5 }, { m: 'M3', type: 'Metric', k: 4.2, l: 6 },
+            { m: 'M4', type: 'Metric', k: 5.2, l: 4 }, { m: 'M4', type: 'Metric', k: 5.2, l: 5 },
+            { m: 'M4', type: 'Metric', k: 5.2, l: 6 }, { m: 'M4', type: 'Metric', k: 5.2, l: 8 },
+            { m: 'M5', type: 'Metric', k: 6.3, l: 5 }, { m: 'M5', type: 'Metric', k: 6.3, l: 6 },
+            { m: 'M5', type: 'Metric', k: 6.3, l: 8 }, { m: 'M5', type: 'Metric', k: 6.3, l: 10 },
+            { m: 'M6', type: 'Metric', k: 7.3, l: 6 }, { m: 'M6', type: 'Metric', k: 7.3, l: 8 },
+            { m: 'M6', type: 'Metric', k: 7.3, l: 10 }, { m: 'M8', type: 'Metric', k: 9.3, l: 8 },
+            { m: 'M8', type: 'Metric', k: 9.3, l: 10 }, { m: 'M8', type: 'Metric', k: 9.3, l: 12 },
+            { m: 'M10', type: 'Metric', k: 11.3, l: 10 }, { m: 'M10', type: 'Metric', k: 11.3, l: 12 },
+            // Imperial Data (lengths and diameters in inches)
+            { m: '#4-40', type: 'Imperial', l: 0.187, holeDia: 0.153, holeDepth: 0.187, k: 0.153 / 0.9 },
+            { m: '#6-32', type: 'Imperial', l: 0.250, holeDia: 0.199, holeDepth: 0.250, k: 0.199 / 0.9 },
+            { m: '#8-32', type: 'Imperial', l: 0.312, holeDia: 0.226, holeDepth: 0.312, k: 0.226 / 0.9 },
+        ].map(d => {
+            let fastenerDia, displayFastenerDia;
+            if (d.type === 'Metric') {
+                fastenerDia = parseFloat(d.m.substring(1));
+                displayFastenerDia = `${fastenerDia.toFixed(1)}mm`;
+                return {
+                    ...d, fastenerDia, displayFastenerDia,
+                    displayL: `${d.l.toFixed(1)}mm`,
+                    displayHoleDia: `${(d.k + 0.2).toFixed(2)}mm`,
+                    displayHoleDepth: `${(d.l + 1).toFixed(1)}mm`,
+                }
+            } else { // Imperial
+                const sizeNum = d.m.match(/#(\d+)/)[1];
+                fastenerDia = imperialDiaMap[sizeNum] || 0;
+                displayFastenerDia = `${fastenerDia.toFixed(3)}"`;
+                 return {
+                    ...d, fastenerDia, displayFastenerDia,
+                    displayL: `${d.l.toFixed(3)}"`,
+                    displayHoleDia: `${d.holeDia.toFixed(3)}"`,
+                    displayHoleDepth: `${d.holeDepth.toFixed(3)}"`,
+                }
+            }
+        });
+
+        const tableBody = document.getElementById('insertTableBody');
+        const sizeFilter = document.getElementById('sizeFilter');
+        const canvas = document.getElementById('insertCanvas');
+        const canvasPlaceholder = document.getElementById('canvas-placeholder');
+        const ctx = canvas.getContext('2d');
+        
+        let selectedRowIndex = -1;
+        let currentSelectedData = null;
+        let zoomLevel = 1.0;
+
+        function populateFilter() {
+            const sizes = [...new Set(insertData.map(d => d.m))];
+            sizes.sort((a, b) => {
+                const aIsMetric = a.startsWith('M');
+                const bIsMetric = b.startsWith('M');
+                if (aIsMetric && !bIsMetric) return -1;
+                if (!aIsMetric && bIsMetric) return 1;
+                if (aIsMetric) {
+                    return parseFloat(a.substring(1)) - parseFloat(b.substring(1));
+                }
+                return parseFloat(a.substring(1)) - parseFloat(b.substring(1));
+            });
+            sizes.forEach(size => {
+                const option = document.createElement('option');
+                option.value = size;
+                option.textContent = size;
+                sizeFilter.appendChild(option);
+            });
+        }
+
+        function populateTable(filter = 'all') {
+            tableBody.innerHTML = '';
+            const filteredData = filter === 'all' ? insertData : insertData.filter(d => d.m === filter);
+            
+            filteredData.forEach((data) => {
+                const row = document.createElement('tr');
+                row.className = 'cursor-pointer hover:bg-gray-100 transition-colors duration-150';
+                
+                const originalIndex = insertData.findIndex(d => d.m === data.m && d.l === data.l);
+                if (originalIndex === selectedRowIndex) {
+                    row.classList.add('selected-row');
+                }
+
+                row.innerHTML = `
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${data.m}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${data.displayFastenerDia}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${data.displayL}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${data.displayHoleDia}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${data.displayHoleDepth}</td>
+                `;
+                row.addEventListener('click', () => {
+                    selectedRowIndex = originalIndex;
+                    currentSelectedData = data;
+                    zoomLevel = 1.0;
+                    populateTable(sizeFilter.value);
+                    drawDiagram(currentSelectedData);
+                });
+                tableBody.appendChild(row);
+            });
+        }
+        
+        function drawDiagram(data) {
+            if (!data) {
+                canvasPlaceholder.style.display = 'block';
+                canvas.style.display = 'none';
+                document.getElementById('zoom-controls').style.visibility = 'hidden';
+                return;
+            }
+            
+            canvasPlaceholder.style.display = 'none';
+            canvas.style.display = 'block';
+            document.getElementById('zoom-controls').style.visibility = 'visible';
+
+            const parent = document.getElementById('canvas-parent');
+            canvas.width = parent.clientWidth;
+            canvas.height = parent.clientHeight;
+
+            const inchToMm = 25.4;
+            const isMetric = data.type === 'Metric';
+            
+            const l_mm = isMetric ? data.l : data.l * inchToMm;
+            const k_mm = isMetric ? data.k : data.k * inchToMm;
+            const holeDia_mm = isMetric ? data.k + 0.2 : data.holeDia * inchToMm;
+            const holeDepth_mm = isMetric ? data.l + 1 : data.holeDepth * inchToMm;
+            const chamferDepth_mm = isMetric ? data.l * 0.25 : (data.holeDia - (data.k * 0.9)) / 2 * inchToMm;
+            const innerHoleDia_mm = isMetric ? data.k * 0.9 : data.k * 0.9 * inchToMm;
+            const fastenerDia_mm = isMetric ? data.fastenerDia : data.fastenerDia * inchToMm;
+
+            const maxDim = Math.max(holeDia_mm, holeDepth_mm);
+            const baseScale = Math.min(canvas.width * 0.4 / maxDim, canvas.height * 0.6 / maxDim);
+            const scale = baseScale * zoomLevel;
+            
+            const w = (val) => val * scale;
+
+            const centerX = canvas.width / 2;
+            const topY = canvas.height / 2 - (w(holeDepth_mm) / 2);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '12px Inter';
+            
+            const holeW = w(holeDia_mm);
+            const innerHoleW = w(innerHoleDia_mm);
+            const holeH = w(holeDepth_mm);
+            const chamferH = w(chamferDepth_mm);
+            const materialPadding = 30 * zoomLevel;
+
+            ctx.fillStyle = '#d1d5db';
+            ctx.fillRect(centerX - holeW / 2 - materialPadding, topY, holeW + materialPadding * 2, holeH);
+
+            ctx.fillStyle = getComputedStyle(document.getElementById('canvas-parent')).backgroundColor;
+            ctx.fillRect(centerX - innerHoleW / 2, topY + chamferH, innerHoleW, holeH - chamferH);
+
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.moveTo(centerX - holeW / 2, topY);
+            ctx.lineTo(centerX + holeW / 2, topY);
+            ctx.lineTo(centerX + innerHoleW / 2, topY + chamferH);
+            ctx.lineTo(centerX - innerHoleW / 2, topY + chamferH);
+            ctx.closePath();
+            ctx.fill();
+
+            const insertW = w(k_mm);
+            const insertH = w(l_mm);
+            const insertY = topY + w(isMetric ? 1 : 1 / inchToMm);
+
+            const fastenerW = w(fastenerDia_mm);
+            ctx.fillStyle = '#9ca3af'; // gray-400
+            ctx.fillRect(centerX - fastenerW / 2, topY - w(5), fastenerW, holeH + w(10));
+
+
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(centerX - insertW / 2, insertY, insertW, insertH);
+            ctx.strokeStyle = '#2563eb';
+            ctx.strokeRect(centerX - insertW / 2, insertY, insertW, insertH);
+
+            drawDimensionLine(centerX + holeW / 2 + 30, topY, centerX + holeW / 2 + 30, topY + holeH, `Hole Depth: ${data.displayHoleDepth}`);
+            drawDimensionLine(centerX - holeW / 2, topY - 40, centerX + holeW / 2, topY - 40, `Hole Dia: ${data.displayHoleDia}`);
+            drawDimensionLine(centerX - fastenerW / 2, topY - 20, centerX + fastenerW / 2, topY - 20, `Fastener: ${data.displayFastenerDia}`);
+            drawDimensionLine(centerX - insertW / 2, insertY + insertH + 20, centerX + insertW / 2, insertY + insertH + 20, `Knurl (K): ${isMetric ? data.k.toFixed(1) + 'mm' : (data.k).toFixed(3) + '"'}`);
+            drawDimensionLine(centerX - insertW/2 - 30, insertY, centerX - insertW/2 - 30, insertY + insertH, `Length (L): ${data.displayL}`);
+        }
+
+        function drawDimensionLine(x1, y1, x2, y2, text) {
+            ctx.beginPath();
+            ctx.strokeStyle = '#4b5563';
+            ctx.lineWidth = 1;
+            
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+
+            if (y1 === y2) {
+                ctx.moveTo(x1, y1 - 5);
+                ctx.lineTo(x1, y1 + 5);
+                ctx.moveTo(x2, y2 - 5);
+                ctx.lineTo(x2, y2 + 5);
+            } else {
+                ctx.moveTo(x1 - 5, y1);
+                ctx.lineTo(x1 + 5, y1);
+                ctx.moveTo(x2 - 5, y2);
+                ctx.lineTo(x2 + 5, y2);
+            }
+            ctx.stroke();
+
+            ctx.fillStyle = '#111827';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            if (y1 === y2) {
+                ctx.fillText(text, (x1 + x2) / 2, y1 - 15);
+            } else {
+                ctx.save();
+                ctx.translate(x1 - 10, (y1 + y2) / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText(text, 0, 0);
+                ctx.restore();
+            }
+        }
+
+
+        window.addEventListener('DOMContentLoaded', () => {
+            populateFilter();
+            populateTable();
+            drawDiagram(null);
+
+            sizeFilter.addEventListener('change', (e) => {
+                selectedRowIndex = -1;
+                currentSelectedData = null;
+                zoomLevel = 1.0;
+                drawDiagram(null);
+                populateTable(e.target.value);
+            });
+
+            document.getElementById('zoom-in').addEventListener('click', () => {
+                if(currentSelectedData) {
+                    zoomLevel += 0.2;
+                    drawDiagram(currentSelectedData);
+                }
+            });
+
+            document.getElementById('zoom-out').addEventListener('click', () => {
+                if(currentSelectedData) {
+                    zoomLevel = Math.max(0.4, zoomLevel - 0.2);
+                    drawDiagram(currentSelectedData);
+                }
+            });
+
+            document.getElementById('zoom-reset').addEventListener('click', () => {
+                if(currentSelectedData) {
+                    zoomLevel = 1.0;
+                    drawDiagram(currentSelectedData);
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                if (currentSelectedData) {
+                    drawDiagram(currentSelectedData);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
