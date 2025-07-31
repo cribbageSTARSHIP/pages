@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drill Bit Finder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the highlighted row */
+        .highlight {
+            background-color: #d1fae5; /* A light green from Tailwind's color palette */
+            font-weight: 600;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="bg-white rounded-xl shadow-lg p-6 md:p-8">
+            
+            <!-- Header Section -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">Drill Bit Finder</h1>
+                <p class="mt-2 text-slate-600">Find the perfect drill bit for your needs. From PCB to large-scale bits.</p>
+            </div>
+
+            <!-- Input Section -->
+            <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 md:p-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div class="md:col-span-2">
+                        <label for="holeSize" class="block text-sm font-medium text-slate-700 mb-1">Desired Hole Size</label>
+                        <input type="number" id="holeSize" step="any" placeholder="e.g., 6.5" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="unitSelector" class="block text-sm font-medium text-slate-700 mb-1">Unit</label>
+                        <select id="unitSelector" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="mm" selected>Millimeters (mm)</option>
+                            <option value="in">Inches (in)</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                         <button onclick="findBit()" class="w-full bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">Find</button>
+                         <button onclick="resetTable()" class="w-full bg-slate-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition duration-150 ease-in-out">Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsArea" class="overflow-x-auto max-h-[60vh] overflow-y-auto border border-slate-200 rounded-lg">
+                <!-- Table will be dynamically inserted here -->
+            </div>
+             <div id="messageArea" class="text-center p-4 text-slate-500"></div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- DATA SOURCE ---
+        // A comprehensive, sorted list of drill bits including Metric, Imperial (Fractional), Number, and Letter sizes.
+        // All sizes are converted to mm for a unified sorting and comparison key.
+        const drillBits = [
+            { name: 'No. 97', type: 'Number', mm: 0.1651, in_dec: 0.0065, in_frac: null },
+            { name: 'No. 96', type: 'Number', mm: 0.1778, in_dec: 0.0070, in_frac: null },
+            { name: 'No. 95', type: 'Number', mm: 0.2032, in_dec: 0.0080, in_frac: null },
+            { name: 'No. 94', type: 'Number', mm: 0.2286, in_dec: 0.0090, in_frac: null },
+            { name: 'No. 93', type: 'Number', mm: 0.2540, in_dec: 0.0100, in_frac: null },
+            { name: 'No. 92', type: 'Number', mm: 0.2794, in_dec: 0.0110, in_frac: null },
+            { name: 'No. 91', type: 'Number', mm: 0.3048, in_dec: 0.0120, in_frac: null },
+            { name: 'No. 90', type: 'Number', mm: 0.3175, in_dec: 0.0125, in_frac: null },
+            { name: 'No. 89', type: 'Number', mm: 0.3302, in_dec: 0.0130, in_frac: null },
+            { name: 'No. 88', type: 'Number', mm: 0.3429, in_dec: 0.0135, in_frac: null },
+            { name: 'No. 87', type: 'Number', mm: 0.3556, in_dec: 0.0140, in_frac: null },
+            { name: 'No. 86', type: 'Number', mm: 0.3683, in_dec: 0.0145, in_frac: null },
+            { name: 'No. 85', type: 'Number', mm: 0.3810, in_dec: 0.0150, in_frac: null },
+            { name: '1/64"', type: 'Imperial', mm: 0.3969, in_dec: 0.0156, in_frac: '1/64' },
+            { name: 'No. 84', type: 'Number', mm: 0.4064, in_dec: 0.0160, in_frac: null },
+            { name: 'No. 83', type: 'Number', mm: 0.4318, in_dec: 0.0170, in_frac: null },
+            { name: 'No. 82', type: 'Number', mm: 0.4572, in_dec: 0.0180, in_frac: null },
+            { name: 'No. 81', type: 'Number', mm: 0.4826, in_dec: 0.0190, in_frac: null },
+            { name: '0.50 mm', type: 'Metric', mm: 0.5000, in_dec: 0.0197, in_frac: null },
+            { name: 'No. 80', type: 'Number', mm: 0.5207, in_dec: 0.0205, in_frac: null },
+            { name: 'No. 79', type: 'Number', mm: 0.5461, in_dec: 0.0215, in_frac: null },
+            { name: 'No. 78', type: 'Number', mm: 0.5715, in_dec: 0.0225, in_frac: null },
+            { name: 'No. 77', type: 'Number', mm: 0.6096, in_dec: 0.0240, in_frac: null },
+            { name: 'No. 76', type: 'Number', mm: 0.6350, in_dec: 0.0250, in_frac: null },
+            { name: 'No. 75', type: 'Number', mm: 0.6604, in_dec: 0.0260, in_frac: null },
+            { name: 'No. 74', type: 'Number', mm: 0.6858, in_dec: 0.0270, in_frac: null },
+            { name: 'No. 73', type: 'Number', mm: 0.7112, in_dec: 0.0280, in_frac: null },
+            { name: 'No. 72', type: 'Number', mm: 0.7366, in_dec: 0.0290, in_frac: null },
+            { name: 'No. 71', type: 'Number', mm: 0.7620, in_dec: 0.0300, in_frac: null },
+            { name: 'No. 70', type: 'Number', mm: 0.7874, in_dec: 0.0310, in_frac: null },
+            { name: '1/32"', type: 'Imperial', mm: 0.7938, in_dec: 0.0313, in_frac: '1/32' },
+            { name: '0.80 mm', type: 'Metric', mm: 0.8000, in_dec: 0.0315, in_frac: null },
+            { name: 'No. 69', type: 'Number', mm: 0.8128, in_dec: 0.0320, in_frac: null },
+            { name: 'No. 68', type: 'Number', mm: 0.8382, in_dec: 0.0330, in_frac: null },
+            { name: 'No. 67', type: 'Number', mm: 0.8636, in_dec: 0.0340, in_frac: null },
+            { name: 'No. 66', type: 'Number', mm: 0.8890, in_dec: 0.0350, in_frac: null },
+            { name: '0.90 mm', type: 'Metric', mm: 0.9000, in_dec: 0.0354, in_frac: null },
+            { name: 'No. 65', type: 'Number', mm: 0.9144, in_dec: 0.0360, in_frac: null },
+            { name: 'No. 64', type: 'Number', mm: 0.9398, in_dec: 0.0370, in_frac: null },
+            { name: 'No. 63', type: 'Number', mm: 0.9652, in_dec: 0.0380, in_frac: null },
+            { name: 'No. 62', type: 'Number', mm: 0.9906, in_dec: 0.0390, in_frac: null },
+            { name: '1.00 mm', type: 'Metric', mm: 1.0000, in_dec: 0.0394, in_frac: null },
+            { name: 'No. 61', type: 'Number', mm: 1.0160, in_dec: 0.0400, in_frac: null },
+            { name: 'No. 60', type: 'Number', mm: 1.0414, in_dec: 0.0410, in_frac: null },
+            { name: 'No. 59', type: 'Number', mm: 1.0668, in_dec: 0.0420, in_frac: null },
+            { name: 'No. 58', type: 'Number', mm: 1.0922, in_dec: 0.0430, in_frac: null },
+            { name: 'No. 57', type: 'Number', mm: 1.1430, in_dec: 0.0450, in_frac: null },
+            { name: 'No. 56', type: 'Number', mm: 1.1811, in_dec: 0.0465, in_frac: null },
+            { name: '3/64"', type: 'Imperial', mm: 1.1906, in_dec: 0.0469, in_frac: '3/64' },
+            { name: '1.20 mm', type: 'Metric', mm: 1.2000, in_dec: 0.0472, in_frac: null },
+            { name: 'No. 55', type: 'Number', mm: 1.3208, in_dec: 0.0520, in_frac: null },
+            { name: '1.40 mm', type: 'Metric', mm: 1.4000, in_dec: 0.0551, in_frac: null },
+            { name: 'No. 54', type: 'Number', mm: 1.4478, in_dec: 0.0570, in_frac: null },
+            { name: 'No. 53', type: 'Number', mm: 1.5113, in_dec: 0.0595, in_frac: null },
+            { name: '1/16"', type: 'Imperial', mm: 1.5875, in_dec: 0.0625, in_frac: '1/16' },
+            { name: '1.60 mm', type: 'Metric', mm: 1.6000, in_dec: 0.0630, in_frac: null },
+            { name: 'No. 52', type: 'Number', mm: 1.6129, in_dec: 0.0635, in_frac: null },
+            { name: 'No. 51', type: 'Number', mm: 1.7018, in_dec: 0.0670, in_frac: null },
+            { name: 'No. 50', type: 'Number', mm: 1.7780, in_dec: 0.0700, in_frac: null },
+            { name: '1.80 mm', type: 'Metric', mm: 1.8000, in_dec: 0.0709, in_frac: null },
+            { name: 'No. 49', type: 'Number', mm: 1.8542, in_dec: 0.0730, in_frac: null },
+            { name: 'No. 48', type: 'Number', mm: 1.9304, in_dec: 0.0760, in_frac: null },
+            { name: '5/64"', type: 'Imperial', mm: 1.9844, in_dec: 0.0781, in_frac: '5/64' },
+            { name: '2.00 mm', type: 'Metric', mm: 2.0000, in_dec: 0.0787, in_frac: null },
+            { name: 'No. 47', type: 'Number', mm: 2.0320, in_dec: 0.0800, in_frac: null },
+            { name: 'No. 46', type: 'Number', mm: 2.0574, in_dec: 0.0810, in_frac: null },
+            { name: 'No. 45', type: 'Number', mm: 2.0828, in_dec: 0.0820, in_frac: null },
+            { name: 'No. 44', type: 'Number', mm: 2.1844, in_dec: 0.0860, in_frac: null },
+            { name: 'No. 43', type: 'Number', mm: 2.2606, in_dec: 0.0890, in_frac: null },
+            { name: 'No. 42', type: 'Number', mm: 2.3622, in_dec: 0.0930, in_frac: null },
+            { name: '3/32"', type: 'Imperial', mm: 2.3813, in_dec: 0.0938, in_frac: '3/32' },
+            { name: 'No. 41', type: 'Number', mm: 2.4384, in_dec: 0.0960, in_frac: null },
+            { name: 'No. 40', type: 'Number', mm: 2.4892, in_dec: 0.0980, in_frac: null },
+            { name: '2.50 mm', type: 'Metric', mm: 2.5000, in_dec: 0.0984, in_frac: null },
+            { name: 'No. 39', type: 'Number', mm: 2.5146, in_dec: 0.0990, in_frac: null },
+            { name: 'No. 38', type: 'Number', mm: 2.5654, in_dec: 0.1010, in_frac: null },
+            { name: 'No. 37', type: 'Number', mm: 2.6416, in_dec: 0.1040, in_frac: null },
+            { name: 'No. 36', type: 'Number', mm: 2.6924, in_dec: 0.1060, in_frac: null },
+            { name: '7/64"', type: 'Imperial', mm: 2.7781, in_dec: 0.1094, in_frac: '7/64' },
+            { name: 'No. 35', type: 'Number', mm: 2.7940, in_dec: 0.1100, in_frac: null },
+            { name: 'No. 34', type: 'Number', mm: 2.8194, in_dec: 0.1110, in_frac: null },
+            { name: 'No. 33', type: 'Number', mm: 2.8702, in_dec: 0.1130, in_frac: null },
+            { name: 'No. 32', type: 'Number', mm: 2.9464, in_dec: 0.1160, in_frac: null },
+        	{ name: '3.00 mm', type: 'Metric', mm: 3.0000, in_dec: 0.1181, in_frac: null },
+            { name: 'No. 31', type: 'Number', mm: 3.0480, in_dec: 0.1200, in_frac: null },
+            { name: '1/8"', type: 'Imperial', mm: 3.1750, in_dec: 0.1250, in_frac: '1/8' },
+            { name: 'No. 30', type: 'Number', mm: 3.2639, in_dec: 0.1285, in_frac: null },
+            { name: '3.30 mm', type: 'Metric', mm: 3.3000, in_dec: 0.1299, in_frac: null },
+            { name: 'No. 29', type: 'Number', mm: 3.4544, in_dec: 0.1360, in_frac: null },
+            { name: 'No. 28', type: 'Number', mm: 3.5687, in_dec: 0.1405, in_frac: null },
+            { name: '9/64"', type: 'Imperial', mm: 3.5719, in_dec: 0.1406, in_frac: '9/64' },
+            { name: 'No. 27', type: 'Number', mm: 3.6576, in_dec: 0.1440, in_frac: null },
+            { name: 'No. 26', type: 'Number', mm: 3.7338, in_dec: 0.1470, in_frac: null },
+            { name: 'No. 25', type: 'Number', mm: 3.7846, in_dec: 0.1490, in_frac: null },
+            { name: 'No. 24', type: 'Number', mm: 3.8608, in_dec: 0.1520, in_frac: null },
+            { name: 'No. 23', type: 'Number', mm: 3.9116, in_dec: 0.1540, in_frac: null },
+            { name: '5/32"', type: 'Imperial', mm: 3.9688, in_dec: 0.1563, in_frac: '5/32' },
+            { name: '4.00 mm', type: 'Metric', mm: 4.0000, in_dec: 0.1575, in_frac: null },
+            { name: 'No. 22', type: 'Number', mm: 4.0386, in_dec: 0.1590, in_frac: null },
+            { name: 'No. 21', type: 'Number', mm: 4.0894, in_dec: 0.1610, in_frac: null },
+            { name: 'No. 20', type: 'Number', mm: 4.1148, in_dec: 0.1620, in_frac: null },
+            { name: 'No. 19', type: 'Number', mm: 4.2164, in_dec: 0.1660, in_frac: null },
+            { name: '11/64"', type: 'Imperial', mm: 4.3656, in_dec: 0.1719, in_frac: '11/64' },
+            { name: 'No. 18', type: 'Number', mm: 4.3942, in_dec: 0.1730, in_frac: null },
+            { name: 'No. 17', type: 'Number', mm: 4.4958, in_dec: 0.1770, in_frac: null },
+            { name: '4.50 mm', type: 'Metric', mm: 4.5000, in_dec: 0.1772, in_frac: null },
+            { name: 'No. 16', type: 'Number', mm: 4.5212, in_dec: 0.1780, in_frac: null },
+            { name: 'No. 15', type: 'Number', mm: 4.5720, in_dec: 0.1800, in_frac: null },
+            { name: '3/16"', type: 'Imperial', mm: 4.7625, in_dec: 0.1875, in_frac: '3/16' },
+            { name: 'A', type: 'Letter', mm: 5.9436, in_dec: 0.2340, in_frac: null },
+            { name: 'B', type: 'Letter', mm: 6.0452, in_dec: 0.2380, in_frac: null },
+            { name: 'C', type: 'Letter', mm: 6.1468, in_dec: 0.2420, in_frac: null },
+            { name: 'D', type: 'Letter', mm: 6.2484, in_dec: 0.2460, in_frac: null },
+            { name: 'E', type: 'Letter', mm: 6.3500, in_dec: 0.2500, in_frac: null },
+            { name: 'F', type: 'Letter', mm: 6.5278, in_dec: 0.2570, in_frac: null },
+            { name: 'G', type: 'Letter', mm: 6.6294, in_dec: 0.2610, in_frac: null },
+            { name: 'H', type: 'Letter', mm: 6.7564, in_dec: 0.2660, in_frac: null },
+            { name: 'I', type: 'Letter', mm: 6.9088, in_dec: 0.2720, in_frac: null },
+            { name: 'J', type: 'Letter', mm: 7.0104, in_dec: 0.2760, in_frac: null },
+            { name: 'K', type: 'Letter', mm: 7.1374, in_dec: 0.2810, in_frac: null },
+            { name: 'L', type: 'Letter', mm: 7.3660, in_dec: 0.2900, in_frac: null },
+            { name: 'M', type: 'Letter', mm: 7.4930, in_dec: 0.2950, in_frac: null },
+            { name: 'N', type: 'Letter', mm: 7.6708, in_dec: 0.3020, in_frac: null },
+            { name: 'O', type: 'Letter', mm: 7.9756, in_dec: 0.3140, in_frac: null },
+            { name: 'P', type: 'Letter', mm: 8.2296, in_dec: 0.3240, in_frac: null },
+            { name: 'Q', type: 'Letter', mm: 8.4328, in_dec: 0.3320, in_frac: null },
+            { name: 'R', type: 'Letter', mm: 8.6106, in_dec: 0.3390, in_frac: null },
+            { name: 'S', type: 'Letter', mm: 8.8646, in_dec: 0.3490, in_frac: null },
+            { name: 'T', type: 'Letter', mm: 9.0932, in_dec: 0.3580, in_frac: null },
+            { name: 'U', type: 'Letter', mm: 9.3218, in_dec: 0.3670, in_frac: null },
+            { name: 'V', type: 'Letter', mm: 9.5758, in_dec: 0.3770, in_frac: null },
+            { name: 'W', type: 'Letter', mm: 9.7790, in_dec: 0.3850, in_frac: null },
+            { name: 'X', type: 'Letter', mm: 10.0838, in_dec: 0.3970, in_frac: null },
+            { name: 'Y', type: 'Letter', mm: 10.2616, in_dec: 0.4040, in_frac: null },
+            { name: 'Z', type: 'Letter', mm: 10.4902, in_dec: 0.4130, in_frac: null },
+            { name: '1/2"', type: 'Imperial', mm: 12.7000, in_dec: 0.5000, in_frac: '1/2' },
+            { name: '9/16"', type: 'Imperial', mm: 14.2875, in_dec: 0.5625, in_frac: '9/16' },
+            { name: '5/8"', type: 'Imperial', mm: 15.8750, in_dec: 0.6250, in_frac: '5/8' },
+            { name: '11/16"', type: 'Imperial', mm: 17.4625, in_dec: 0.6875, in_frac: '11/16' },
+            { name: '3/4"', type: 'Imperial', mm: 19.0500, in_dec: 0.7500, in_frac: '3/4' },
+        ];
+
+        // --- DOM Elements ---
+        const resultsArea = document.getElementById('resultsArea');
+        const messageArea = document.getElementById('messageArea');
+        const holeSizeInput = document.getElementById('holeSize');
+
+        /**
+         * Renders a table from a given array of drill bit data.
+         * @param {Array} data - The array of drill bit objects to render.
+         * @param {number} highlightIndex - The index of the row to highlight in the provided data array.
+         */
+        function renderTable(data, highlightIndex = -1) {
+            if (!data || data.length === 0) {
+                resultsArea.innerHTML = '';
+                messageArea.textContent = 'No results found.';
+                return;
+            }
+
+            // Table header
+            let tableHtml = `
+                <table class="w-full text-sm text-left text-slate-500">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">Name</th>
+                            <th scope="col" class="px-4 py-3">Type</th>
+                            <th scope="col" class="px-4 py-3 text-right">mm</th>
+                            <th scope="col" class="px-4 py-3 text-right">Inches (Decimal)</th>
+                            <th scope="col" class="px-4 py-3">Inches (Fraction)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            // Table body
+            data.forEach((bit, index) => {
+                const isHighlight = (index === highlightIndex);
+                const rowClass = isHighlight ? 'highlight' : 'bg-white hover:bg-slate-50';
+                tableHtml += `
+                    <tr class="${rowClass} border-b">
+                        <td class="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">${bit.name}</td>
+                        <td class="px-4 py-3">${bit.type}</td>
+                        <td class="px-4 py-3 text-right">${bit.mm.toFixed(4)}</td>
+                        <td class="px-4 py-3 text-right">${bit.in_dec.toFixed(4)}</td>
+                        <td class="px-4 py-3">${bit.in_frac || '---'}</td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += '</tbody></table>';
+            resultsArea.innerHTML = tableHtml;
+            messageArea.textContent = `${data.length} results shown.`;
+            
+            // Scroll the highlighted element into view
+            if (highlightIndex > -1) {
+                const highlightedElement = resultsArea.querySelector('.highlight');
+                if (highlightedElement) {
+                    highlightedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        /**
+         * Finds the best drill bit match based on user input and displays the results.
+         */
+        function findBit() {
+            const desiredSize = parseFloat(holeSizeInput.value);
+            const unit = document.getElementById('unitSelector').value;
+
+            if (isNaN(desiredSize) || desiredSize <= 0) {
+                messageArea.textContent = 'Please enter a valid positive number.';
+                resetTable();
+                return;
+            }
+
+            // Convert input to a common unit (mm) for comparison
+            const desiredSizeInMm = (unit === 'in') ? desiredSize * 25.4 : desiredSize;
+
+            // Find the first bit that is >= the desired size.
+            // Since the list is sorted, this is the most efficient approach.
+            let bestMatchIndex = -1;
+            for (let i = 0; i < drillBits.length; i++) {
+                if (drillBits[i].mm >= desiredSizeInMm) {
+                    bestMatchIndex = i;
+                    break;
+                }
+            }
+            
+            // Handle cases where the desired size is larger than any bit in the list
+            if (bestMatchIndex === -1) {
+                messageArea.textContent = `No bit found for ${desiredSize}${unit}. The size may be too large for this chart. Showing the largest available bits.`;
+                const lastBits = drillBits.slice(-21); // Show last 20 + highlight
+                renderTable(lastBits, -1); // No highlight
+                return;
+            }
+            
+            // Define the range: 10 bits below and 10 bits above the match
+            const startIndex = Math.max(0, bestMatchIndex - 10);
+            const endIndex = Math.min(drillBits.length, bestMatchIndex + 11); // +11 to include the 10th item after
+            
+            const resultsSlice = drillBits.slice(startIndex, endIndex);
+            const highlightIndexInSlice = bestMatchIndex - startIndex;
+
+            renderTable(resultsSlice, highlightIndexInSlice);
+        }
+        
+        /**
+         * Resets the view to show the full table of drill bits.
+         */
+        function resetTable() {
+            holeSizeInput.value = '';
+            renderTable(drillBits);
+        }
+        
+        // Add event listener for 'Enter' key on the input field
+        holeSizeInput.addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent form submission if it were in a form
+                findBit();
+            }
+        });
+
+        // --- Initial Load ---
+        // Display the full table when the page first loads.
+        window.onload = () => {
+            renderTable(drillBits);
+        };
+    </script>
+
+</body>
+</html>
